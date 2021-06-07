@@ -522,6 +522,20 @@ func (c *Client) RestartInstances(key aurora.JobKey, instances ...int32) error {
 	return nil
 }
 
+// Restarts specific instances with SLA specified
+func (c *Client) SlaRestartInstances(key aurora.JobKey, policy *aurora.SlaPolicy, instances ...int32) error {
+	c.logger.DebugPrintf("SlaRestartInstances Thrift Payload: %+v %v\n", key, instances)
+
+	_, retryErr := c.thriftCallWithRetries(false, func() (*aurora.Response, error) {
+		return c.client.SlaRestartShards(context.TODO(), &key, instances, policy)
+	})
+
+	if retryErr != nil {
+		return errors.Wrap(retryErr, "error sending SlaRestartInstances command to Aurora Scheduler")
+	}
+	return nil
+}
+
 // Restarts all active tasks under a job configuration.
 func (c *Client) RestartJob(key aurora.JobKey) error {
 
