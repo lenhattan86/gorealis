@@ -522,6 +522,50 @@ func (c *Client) RestartInstances(key aurora.JobKey, instances ...int32) error {
 	return nil
 }
 
+// Restarts specific instances specified with slaAware.
+// If slaPolicy is nil, uses the existing slaPolicy of taskConfig.
+func (c *Client) SlaRestartInstances(slaPolicy *aurora.SlaPolicy, jobKey *aurora.JobKey, instances ...int32) error {
+	c.logger.DebugPrintf("SlaRestartInstances Thrift Payload: %v %+v %v\n", slaPolicy, jobKey, instances)
+
+	if len(instances) == 0 {
+		c.logger.DebugPrintf("it is not necessary to restart 0 instances")
+		return nil
+	}
+
+	jobSummary, err := c.GetJobSummary(jobKey.Role)
+	if err != nil {
+		return err
+	}
+	var jobConfig *aurora.JobConfiguration
+	for _, s := range jobSummary.Summaries {
+		if s.Job.Key.Environment == jobKey.Environment && s.Job.Key.Name == jobKey.Name {
+			jobConfig = s.Job
+		}
+	}
+	if jobConfig == nil {
+		return fmt.Errorf("failed to find %v", jobKey)
+	}
+
+	// create job update request
+	jobUpdate := JobUpdateFromConfig(jobConfig.TaskConfig)
+	jobUpdate.
+		SlaAware(true).
+		InstanceCount(jobConfig.InstanceCount)
+	if slaPolicy != nil {
+		jobUpdate.SlaPolicy(slaPolicy)
+	}
+	for _, v := range instances {
+		jobUpdate.AddInstanceRange(v, v)
+	}
+
+	msg := fmt.Sprintf("SlaRestartInstances %v-%v via StartJobUpdate", jobKey, instances)
+	if _, err := c.StartJobUpdate(jobUpdate, ""); err != nil {
+		return errors.Wrap(err, msg)
+	}
+
+	return nil
+}
+
 // Restarts all active tasks under a job configuration.
 func (c *Client) RestartJob(key aurora.JobKey) error {
 
