@@ -284,3 +284,8 @@ func (j *JobUpdate) PartitionPolicy(reschedule bool, delay int64) *JobUpdate {
 	})
 	return j
 }
+
+func (j *JobUpdate) SlaPolicy(sla *aurora.SlaPolicy) *JobUpdate {
+	j.task.task.SlaPolicy = sla
+	return j
+}
